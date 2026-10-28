@@ -1,0 +1,249 @@
+# ── qq-bot-memory 配置 ──
+# 首次启动会自动生成 config.yaml，改这个文件后重启生效
+
+# OneBot 11 协议端（NapCat）
+onebot:
+  # WebSocket 正向连接地址，NapCat 监听此端口
+  ws_url: "ws://127.0.0.1:3001"
+  # NapCat 配置的 access token，没有就留空
+  access_token: ""
+  # 机器人 QQ 号。填了就用于 NapCat 快速登录（免扫码）；留 0 则需扫码
+  self_id: 0
+  # 是否由本程序托管启动 NapCat。设 false 则需自己先启动
+  auto_start: true
+  # 断线重连基础间隔（秒），按指数退避
+  reconnect_base_sec: 3
+  reconnect_max_sec: 60
+
+# LLM
+llm:
+  base_url: "http://127.0.0.1:7864/v1"
+  api_key: ""
+  model: "deepseek-v4.1-flash"
+  temperature: 0.8
+  max_tokens: 800
+
+  # ── 辅助识图模型（独立地址与接口，与主聊天模型分开）──
+  # 图片先由它转成一句文字描述，再喂给主模型。
+  vision:
+    enabled: true
+    base_url: "http://127.0.0.1:7866/v1"
+    api_key: ""            # 留空复用上面的 llm.api_key
+    path: "/chat/completions"
+    model: "Qwen3-VL-235B"
+    timeout_ms: 40000
+    max_images: 2
+  timeout_ms: 60000
+
+# 向量服务（Python，已内置在 vector-service 目录）
+vector:
+  url: "http://127.0.0.1:8765"
+  # 是否由本程序自动启动向量服务。设为 false 则需自己先启动
+  auto_start: true
+  corpus: "memory_fragments"
+  timeout_ms: 8000
+  # 聊天流召回限时，超时降级到纯文本检索
+  recall_timeout_ms: 3000
+  top_k: 5
+
+# 触发控制
+trigger:
+  # 回复频率 0~1。0.05 ≈ 每小时只说 5% 的话
+  # 注意：不能设 0，否则 @ 也不会回
+  frequency: 0.05
+  # 被 @ 必回
+  reply_on_at: true
+  # 提到名字必回（QQ 群名片易误判，默认关）
+  reply_on_mention: false
+  # 机器人昵称与别名，用于提及匹配
+  nicknames: []
+  # 消息防抖：等这段时间内的消息收齐再判定（秒）
+  debounce_sec: 0.4
+  # 空闲退避：连续空转后的退避基数与上限（秒）
+  idle_backoff_base_sec: 30
+  idle_backoff_cap_sec: 600
+  idle_backoff_start_count: 3
+  # 主动插话阈值校准（越小越爱插话）：0.3 活跃 / 0.55 适中 / 0.8 沉默
+  # 概率模型权重来自其他 bot 的拟合，概率尺度不同，用这个系数对齐
+  threshold_scale: 0.55
+
+# 拟人化
+persona:
+  # 错别字
+  typo:
+    enabled: true
+    # 单字错字概率
+    error_rate: 0.01
+    # 声调错误概率
+    tone_error_rate: 0.1
+    # 整词替换概率
+    word_replace_rate: 0.006
+    # 生成纠正消息的概率
+    correction_probability: 0.5
+  # 回复分段
+  splitter:
+    enabled: true
+    max_length: 200
+    max_split_num: 3
+  # 打字延迟
+  typing:
+    enabled: false
+    # 0=最快，1=默认，2=更慢
+    speed: 1
+    # 每个中文字符的等待时长，0.09 约每分钟 111 字（正常打字速度）
+    chinese_char_sec: 0.09
+    english_char_sec: 0.045
+  # 引用回复：按概率模型决定是否引用触发回复的那条消息
+  # 真人会指着某句话回，但每次都引用就成了客服
+  quote:
+    # never=从不 | occasionally=偶尔 | often=经常
+    frequency: "occasionally"
+  # 注意力漂移：控制回复「跑题」的程度，让说话不像 AI
+  drift:
+    # subtle=轻微 | active=活跃 | scattered=明显发散 | wild=强烈跳跃
+    level: "subtle"
+    # strict=严格回钩 | balanced=自然回钩 | loose=宽松关联
+    anchor_policy: "balanced"
+    # reserved=少量短反应 | natural=自然 | lively=活泼
+    reaction_style: "natural"
+
+# 记忆
+memory:
+  enabled: true
+  # 记忆整理触发条件，满足任一即可
+  curate_every_rounds: 10
+  # 新增消息达到多少条就整理。群聊消息多但机器人回复少时，靠这个兜底
+  curate_every_messages: 40
+  # 单次整理最多产出的记忆条数
+  max_actions: 12
+  # 群聊是否按人建子语境
+  per_user_namespace: true
+  # 单次召回的上下文轮数
+  history_rounds: 6
+  # 中期记忆：把被裁出短期上下文的对话压缩成「摘要 + 召回线索」
+  # 解决群里聊很多条后，早期话题脉络丢失的问题
+  mid_term:
+    enabled: true
+    # 召回线索与当前对话的相似度阈值（0~1），越高越保守
+    recall_threshold: 0.8
+    # 单次摘要最多引用多少条消息
+    max_messages: 60
+  # 启发式记忆拉起：三重节流，避免密集消息时重复查询向量库
+  heuristic:
+    enabled: true
+    # 距上次召回不足多少秒不再查
+    min_interval_sec: 60
+    # 新增消息不足多少条不再查
+    min_new_messages: 5
+    # 结果缓存有效期（秒），期间直接复用
+    cache_ttl_sec: 180
+  # 人物画像：按 QQ 号积累对每个人的认知
+  profile:
+    enabled: true
+
+# 联网工具：聊天中按需查天气/搜索
+web_tools:
+  # 只在消息明确需要时才联网（问天气、要求搜索），平时零开销
+  enabled: true
+
+# 语音合成：用小米 MiMo 的 voiceclone 模型复刻角色音色
+tts:
+  enabled: true
+  # OpenAI 兼容协议
+  base_url: "https://api.xiaomimimo.com/v1"
+  # MiMo 密钥，形如 sk-xxx。留空则语音功能不可用
+  api_key: ""
+  # voiceclone=复刻音色 | voicedesign=文字设计音色 | mimo-v2.5-tts=预置音色
+  model: "mimo-v2.5-tts-voiceclone"
+  # 音色参考音频，相对项目根目录，mp3 或 wav，20 秒以内最佳
+  # 仓库不分发音频素材，请自备并放好（见 resources/voice/README.md）
+  sample_path: "resources/voice/my-voice.mp3"
+  # 默认风格指令，放进 user 消息，不会出现在语音里
+  style: "用轻快甜软的少女声线说话，语气自然，像在和朋友聊天"
+  # 合成超时，超过就放弃发语音，只留文字回复
+  timeout_ms: 30000
+
+# 生图：用户明确要求「画一张」时才生成
+image:
+  enabled: true
+  # 生图后端：openai = 云端 OpenAI 兼容接口；comfyui = 本地 ComfyUI
+  provider: "openai"
+
+  # 本地 ComfyUI（provider=comfyui 时生效）。用法见 resources/comfyui/README.md
+  comfyui:
+    base_url: "http://127.0.0.1:8188"
+    # 必须是 API 格式工作流（ComfyUI 里 Save (API Format) 导出）
+    workflow: ""
+    negative_prompt: "lowres, bad anatomy, watermark, text"
+    size: "832x1216"
+    steps: 28
+    scale: 5
+    seed: -1
+    timeout_ms: 180000
+    # 参数写入哪个节点的哪个字段，节点 id 每个工作流都不同，需自行对照
+    bindings:
+      positive: { node: "4", input: "text" }
+      negative: { node: "5", input: "text" }
+      width:    { node: "7", input: "width" }
+      height:   { node: "7", input: "height" }
+      steps:    { node: "8", input: "steps" }
+      cfg:      { node: "8", input: "cfg" }
+      seed:     { node: "8", input: "seed" }
+
+  # 云端生图服务（OpenAI 兼容 /v1/images/generations）
+  # 也可以用环境变量 IMAGE_BASE_URL / IMAGE_API_KEY 覆盖
+  base_url: "https://nai.rinko.ai"
+  # 生图密钥，形如 ynai-xxx。留空则生图功能不可用
+  api_key: ""
+  # 只用免费额度：开启后只能选不消耗 Gems 的模型，付费模型会自动降级为 4-5-full
+  free_only: true
+  # 免费额度：服务端规则是每 10 分钟免费 20 张，超出后每张消耗图包次数
+  # 这里默认 18，留 2 张余量给手动测试
+  free_quota_per_10min: 18
+  # 模型：nai-diffusion-4-5-full / nai-diffusion-4-full（实测免费）
+  #      nai-diffusion-5-full（2 Gems/张，付费）
+  model: "nai-diffusion-4-5-full"
+  # 角色固定外貌在「人设」页的「外貌特征」里填，生图直接用它
+  # 负向提示词。留空则用内置默认值（已包含 nsfw / 畸形 / 水印等约束）
+  negative_prompt: ""
+  # 尺寸，竖图 832x1216 出人物半身最稳
+  size: "832x1216"
+  # 采样步数，4-5 系列上限 28
+  steps: 28
+  # 提示词遵循度，4~7 之间，5 比较平衡
+  scale: 5
+  # 单张生图超时（毫秒）
+  timeout_ms: 90000
+  # 同一会话两次生图的最小间隔（秒），防止被人反复要图拖垮配额
+  cooldown_sec: 30
+
+# 转发消息
+forward:
+  # 是否忽略合并转发内容
+  ignore: true
+  # 忽略时是否保留占位记录以维持时间线
+  keep_placeholder: true
+
+# WebUI 管理面板
+webui:
+  enabled: true
+  # 面板端口，浏览器访问 http://127.0.0.1:3099
+  port: 3099
+  # 启动后自动打开面板与 NapCat 控制台
+  auto_open: true
+
+# 日志
+log:
+  level: "info"
+  file: "data/bot.log"
+
+# 心跳主动性（借鉴 Cortico）：冷场时让 bot 有机会主动开口。
+# 默认关闭。建议先在测试群打开观察几天。
+trigger_heartbeat_example: |
+  trigger:
+    heartbeat:
+      enabled: false
+      # 基线间隔（秒）：多久给一次开口机会
+      baseline_sec: 1800
+      # 每会话每天最多主动发言次数
+      daily_limit: 3

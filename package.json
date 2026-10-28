@@ -1,0 +1,22 @@
+{
+  "name": "qq-bot-memory",
+  "version": "0.1.0",
+  "description": "QQ 群聊/私聊记忆机器人：OneBot 11 + 本地向量记忆 + 拟人化回复",
+  "type": "module",
+  "main": "src/main.js",
+  "engines": {
+    "node": ">=22.13.0"
+  },
+  "scripts": {
+    "start": "node src/main.js",
+    "dev": "node --watch src/main.js",
+    "test": "node --test \"test/*.test.js\""
+  },
+  "dependencies": {
+    "better-sqlite3": "^12.11.1",
+    "js-yaml": "^4.1.0",
+    "pinyin-pro": "^3.29.5",
+    "segmentit": "^2.0.3",
+    "ws": "^8.18.0"
+  }
+}

@@ -1,0 +1,26 @@
+node_modules/
+data/
+logs/
+config.yaml
+NapCat.Shell/
+.tmp-*
+*.tmp
+vector-service/python/
+vector-service/models/
+vector-service/chroma_data/
+vector-service/__pycache__/
+vector-service/.venv/
+vector-service/chroma*/
+vector-service/**/chroma*/
+**/chroma.sqlite3
+vector-service/models/
+config.yaml.bak
+.git-old-*/
+
+# 音色样本（版权原因不入库，见 resources/voice/README.md）
+resources/voice/*.mp3
+resources/voice/*.wav
+resources/voice/*.m4a
+
+# 个人 ComfyUI 工作流（含本机模型文件名，不入库）
+resources/comfyui/*.json

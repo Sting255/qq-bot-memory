@@ -1,0 +1,1422 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>qq-bot-memory 管理面板</title>
+<style>
+  :root {
+    --bg: #0e1014;
+    --panel: #161920;
+    --panel-2: #1c202a;
+    --panel-3: #232833;
+    --border: #2a3040;
+    --text: #e6e9ef;
+    --muted: #8992a3;
+    --accent: #4f8cff;
+    --accent-dim: #2b4b80;
+    --ok: #35c26b;
+    --warn: #e8a33d;
+    --err: #e5534b;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font: 14px/1.6 -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif;
+    display: flex; flex-direction: column;
+  }
+  header {
+    display: flex; align-items: center; gap: 14px;
+    padding: 0 20px; height: 54px; border-bottom: 1px solid var(--border);
+    background: var(--panel); flex-shrink: 0;
+  }
+  header h1 { font-size: 14px; margin: 0; font-weight: 600; letter-spacing: .4px; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
+  .dot.ok { background: var(--ok); box-shadow: 0 0 8px var(--ok); }
+  .dot.err { background: var(--err); box-shadow: 0 0 8px var(--err); }
+  .dot.warn { background: var(--warn); }
+  #conn { font-size: 12px; color: var(--muted); margin-left: auto; }
+  .badge {
+    font-size: 11px; padding: 2px 8px; border-radius: 4px;
+    background: var(--panel-3); color: var(--muted); border: 1px solid var(--border);
+  }
+
+  .layout { display: flex; flex: 1; min-height: 0; }
+
+  nav {
+    width: 176px; flex-shrink: 0; background: var(--panel);
+    border-right: 1px solid var(--border); padding: 12px 0; overflow-y: auto;
+  }
+  nav button {
+    display: block; width: 100%; text-align: left; padding: 9px 18px;
+    background: none; border: none; color: var(--muted); font-size: 13px;
+    cursor: pointer; font-family: inherit; border-left: 2px solid transparent;
+  }
+  nav button:hover { color: var(--text); background: var(--panel-2); }
+  nav button.active { color: var(--accent); border-left-color: var(--accent); background: var(--panel-2); }
+  nav .sep { height: 1px; background: var(--border); margin: 8px 14px; }
+
+  main { flex: 1; overflow-y: auto; padding: 20px 24px; min-width: 0; }
+  .page { display: none; }
+  .page.active { display: block; }
+
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin-bottom: 18px; }
+  .card { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; }
+  .card .label { font-size: 11px; color: var(--muted); margin-bottom: 5px; }
+  .card .value { font-size: 20px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .card .value.sm { font-size: 14px; }
+
+  .box { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; margin-bottom: 16px; }
+  .box > h2 {
+    font-size: 13px; font-weight: 600; margin: 0; padding: 13px 16px;
+    border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 8px;
+  }
+  .box > h2 .desc { font-size: 12px; color: var(--muted); font-weight: 400; }
+  .box > .body { padding: 4px 16px 12px; }
+
+  .field { display: flex; align-items: flex-start; gap: 16px; padding: 11px 0; border-bottom: 1px solid var(--border); }
+  .field:last-child { border-bottom: none; }
+  .field .meta { flex: 1; min-width: 0; }
+  .field .name { font-size: 13px; }
+  .field .hint { font-size: 11.5px; color: var(--muted); margin-top: 3px; line-height: 1.5; }
+  .field .ctrl { flex-shrink: 0; width: 200px; display: flex; justify-content: flex-end; }
+
+  input[type=number], input[type=text], input[type=password], select {
+    background: var(--panel-2); border: 1px solid var(--border); color: var(--text);
+    border-radius: 6px; padding: 6px 10px; font-size: 13px; width: 100%;
+    font-family: inherit;
+  }
+  textarea {
+    background: var(--panel-2); border: 1px solid var(--border); color: var(--text);
+    border-radius: 6px; padding: 10px 12px; font-size: 13px; width: 100%;
+    font-family: inherit; resize: vertical; line-height: 1.7;
+    min-height: 70px;
+  }
+  textarea:focus { outline: none; border-color: var(--accent); }
+  textarea.changed { border-color: var(--warn); }
+
+  .persona-field { padding: 14px 0; border-bottom: 1px solid var(--border); }
+  .persona-field:last-child { border-bottom: none; }
+  .persona-field .head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 7px; }
+  .persona-field .head .label { font-size: 13px; font-weight: 500; }
+  .persona-field .head .count { font-size: 11px; color: var(--muted); margin-left: auto; font-variant-numeric: tabular-nums; }
+  .persona-field .hint2 { font-size: 11.5px; color: var(--muted); margin-top: 6px; }
+
+  input:focus, select:focus { outline: none; border-color: var(--accent); }
+  input.changed, select.changed { border-color: var(--warn); }
+
+  .switch { position: relative; width: 42px; height: 23px; flex-shrink: 0; }
+  .switch input { opacity: 0; width: 0; height: 0; }
+  .switch span {
+    position: absolute; inset: 0; background: var(--panel-3); border: 1px solid var(--border);
+    border-radius: 23px; cursor: pointer; transition: .18s;
+  }
+  .switch span::before {
+    content: ''; position: absolute; width: 17px; height: 17px; left: 2px; top: 2px;
+    background: var(--muted); border-radius: 50%; transition: .18s;
+  }
+  .switch input:checked + span { background: var(--accent-dim); border-color: var(--accent); }
+  .switch input:checked + span::before { transform: translateX(19px); background: var(--accent); }
+
+  button {
+    background: var(--accent); color: #fff; border: none; border-radius: 6px;
+    padding: 7px 16px; font-size: 13px; cursor: pointer; font-family: inherit;
+  }
+  button:hover { filter: brightness(1.12); }
+  button:disabled { opacity: .5; cursor: default; }
+  button.ghost { background: var(--panel-2); color: var(--text); border: 1px solid var(--border); }
+  button.danger { background: transparent; color: var(--err); border: 1px solid var(--err); padding: 3px 9px; font-size: 12px; }
+
+  .savebar {
+    position: sticky; bottom: 0; margin: 0 -24px -20px; padding: 12px 24px;
+    background: var(--panel); border-top: 1px solid var(--border);
+    display: flex; gap: 10px; align-items: center;
+  }
+  .savebar .note { font-size: 12px; color: var(--muted); }
+
+  table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  th { text-align: left; color: var(--muted); font-weight: 500; font-size: 11.5px; padding: 7px 9px; border-bottom: 1px solid var(--border); }
+  td { padding: 8px 9px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  tr:last-child td { border-bottom: none; }
+  .mono { font-family: ui-monospace, Consolas, monospace; font-size: 11.5px; }
+  .tag { display: inline-block; padding: 1px 6px; border-radius: 3px; font-size: 10.5px; background: var(--panel-3); color: var(--muted); border: 1px solid var(--border); }
+  .tag.knowledge { color: #7ab8ff; border-color: #2c4a6e; }
+  .tag.preference { color: #c6a2ff; border-color: #46356e; }
+  .tag.emotion { color: #ffb27a; border-color: #6e4a2c; }
+
+  .empty { color: var(--muted); text-align: center; padding: 26px 0; font-size: 12.5px; }
+  .toolbar { display: flex; gap: 10px; align-items: center; margin-bottom: 12px; flex-wrap: wrap; }
+  .toolbar .grow { flex: 1; }
+
+  #logView {
+    background: #0a0c10; border: 1px solid var(--border); border-radius: 6px;
+    padding: 12px; height: calc(100vh - 250px); overflow: auto;
+    font-family: ui-monospace, Consolas, monospace; font-size: 11.5px;
+    line-height: 1.65; white-space: pre-wrap; word-break: break-all; margin: 0;
+  }
+  .lv-error { color: #ff7b72; }
+  .lv-warn { color: #e3b341; }
+  .lv-info { color: #a5b3c9; }
+  .lv-debug { color: #6a7484; }
+
+  .testrow { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--border); }
+  .testrow:last-child { border-bottom: none; }
+  .testrow .tname { flex: 1; }
+  .testresult { font-size: 12px; font-family: ui-monospace, monospace; }
+  .testresult.ok { color: var(--ok); }
+  .testresult.err { color: var(--err); }
+
+  #toast {
+    position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%);
+    background: var(--panel-3); border: 1px solid var(--border); color: var(--text);
+    padding: 10px 20px; border-radius: 8px; font-size: 13px; opacity: 0;
+    transition: opacity .25s; pointer-events: none; z-index: 100; max-width: 70vw;
+  }
+  #toast.show { opacity: 1; }
+  #toast.err { border-color: var(--err); color: var(--err); }
+  /* ── 场景服装 ── */
+  .outfit-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 12px; padding: 8px 0; }
+  .outfit-card { background: var(--panel-2); border: 1px solid var(--border); border-radius: 8px; padding: 12px; }
+  .outfit-card h3 { font-size: 13px; margin-bottom: 4px; display: flex; align-items: center; gap: 8px; }
+  .outfit-card .scene-desc { font-size: 11.5px; color: var(--muted); margin-bottom: 8px; line-height: 1.5; }
+  .outfit-card .tags { font-size: 12px; background: var(--panel-3); border-radius: 6px; padding: 8px; line-height: 1.6; word-break: break-word; min-height: 40px; }
+  .outfit-card .tags.empty-tags { color: var(--muted); }
+  .outfit-card .actions { display: flex; gap: 8px; margin-top: 10px; }
+  .outfit-card .actions button { font-size: 12px; padding: 4px 10px; }
+  .outfit-row { display: flex; gap: 8px; align-items: flex-start; margin-bottom: 8px; }
+  .outfit-row .tags { flex: 1; font-size: 11.5px; background: var(--panel-3); border-radius: 6px; padding: 7px; line-height: 1.55; word-break: break-word; }
+  .outfit-row .tags.empty-tags { color: var(--muted); }
+  .outfit-row button { flex-shrink: 0; padding: 3px 8px; font-size: 11.5px; }
+  .now-badge { display: inline-block; background: var(--accent-dim); color: var(--text); border-radius: 4px; padding: 1px 7px; font-size: 11px; font-weight: 400; }
+
+  /* ── 服装库弹层 ── */
+  .modal-mask { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.62); z-index: 50; align-items: center; justify-content: center; }
+  .modal-mask.open { display: flex; }
+  .modal-box { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; width: min(880px, 93vw); max-height: 86vh; display: flex; flex-direction: column; }
+  .modal-head { padding: 14px 18px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+  .modal-head h3 { font-size: 14px; }
+  .modal-tools { padding: 10px 18px; display: flex; gap: 10px; flex-wrap: wrap; align-items: center; border-bottom: 1px solid var(--border); }
+  .modal-tools input[type=text] { flex: 1; min-width: 170px; }
+  .cat-tabs { display: flex; gap: 6px; flex-wrap: wrap; width: 100%; }
+  .cat-tabs button { font-size: 11.5px; padding: 3px 9px; background: var(--panel-2); color: var(--muted); border: 1px solid var(--border); }
+  .cat-tabs button.active { background: var(--accent-dim); color: var(--text); border-color: var(--accent); }
+  .clothing-list { overflow-y: auto; padding: 12px 18px; display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 8px; flex: 1; }
+  .clothing-item { border: 1px solid var(--border); border-radius: 7px; padding: 8px 10px; cursor: pointer; background: var(--panel-2); }
+  .clothing-item:hover { border-color: var(--accent); }
+  .clothing-item.picked { border-color: var(--accent); background: var(--accent-dim); }
+  .clothing-item .t { font-size: 12.5px; }
+  .clothing-item .g { font-size: 10.5px; color: var(--muted); font-family: ui-monospace, monospace; margin-top: 2px; word-break: break-all; }
+  .selected-bar { padding: 10px 18px; border-top: 1px solid var(--border); font-size: 12px; color: var(--muted); max-height: 84px; overflow-y: auto; }
+  .selected-bar .chip { display: inline-block; background: var(--panel-3); border-radius: 4px; padding: 1px 6px; margin: 2px 4px 2px 0; color: var(--text); }
+  .modal-foot { padding: 12px 18px; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap: 10px; align-items: center; }
+  .modal-foot .note { font-size: 12px; color: var(--muted); margin-right: auto; }
+</style>
+</head>
+<body>
+
+<header>
+  <span class="dot" id="statusDot"></span>
+  <h1>qq-bot-memory</h1>
+  <span class="badge" id="selfBadge">等待登录</span>
+  <span id="conn">连接中…</span>
+</header>
+
+<div class="layout">
+  <nav id="nav">
+    <button class="active" data-page="overview">概览</button>
+    <button data-page="persona">人设</button>
+    <button data-page="outfits">服装</button>
+    <button data-page="config">配置</button>
+    <div class="sep"></div>
+    <button data-page="memories">长期记忆</button>
+    <button data-page="midterm">中期记忆</button>
+    <button data-page="profiles">人物画像</button>
+    <button data-page="audit">召回记录</button>
+    <div class="sep"></div>
+    <button data-page="logs">运行日志</button>
+    <button data-page="tools">诊断工具</button>
+  </nav>
+
+  <main>
+    <!-- 概览 -->
+    <div class="page active" id="page-overview">
+      <div class="cards">
+        <div class="card"><div class="label">运行时长</div><div class="value sm" id="uptime">—</div></div>
+        <div class="card"><div class="label">消息总数</div><div class="value" id="msgCount">—</div></div>
+        <div class="card"><div class="label">长期记忆</div><div class="value" id="memCount">—</div></div>
+        <div class="card"><div class="label">中期记忆</div><div class="value" id="midCount">—</div></div>
+        <div class="card"><div class="label">人物画像</div><div class="value" id="profCount">—</div></div>
+        <div class="card"><div class="label">会话数</div><div class="value" id="convCount">—</div></div>
+        <div class="card"><div class="label">今日 Token</div><div class="value" id="usageToday">—</div></div>
+        <div class="card"><div class="label">累计 Token</div><div class="value" id="usageTotal">—</div></div>
+      </div>
+
+      <div class="box">
+        <h2>服务状态</h2>
+        <div class="body">
+          <div class="field"><div class="meta"><div class="name">OneBot 连接</div><div class="hint">NapCat WebSocket</div></div><div class="ctrl" id="s-onebot">—</div></div>
+          <div class="field"><div class="meta"><div class="name">登录账号</div><div class="hint">机器人 QQ</div></div><div class="ctrl" id="s-account">—</div></div>
+          <div class="field"><div class="meta"><div class="name">向量服务</div><div class="hint" id="s-vector-url">—</div></div><div class="ctrl" id="s-vector">—</div></div>
+          <div class="field"><div class="meta"><div class="name">LLM 模型</div><div class="hint" id="s-llm-url">—</div></div><div class="ctrl" id="s-llm">—</div></div>
+          <div class="field"><div class="meta"><div class="name">回复频率</div><div class="hint">当前生效值</div></div><div class="ctrl" id="s-freq">—</div></div>
+          <div class="field"><div class="meta"><div class="name">待索引任务</div><div class="hint">向量写入队列</div></div><div class="ctrl" id="s-jobs">—</div></div>
+        </div>
+      </div>
+
+      <div class="box">
+        <h2>当前配置摘要</h2>
+        <div class="body" id="summaryBody"><div class="empty">加载中…</div></div>
+      </div>
+    </div>
+
+    <!-- 人设 -->
+    <div class="page" id="page-persona">
+      <div class="box">
+        <h2>从网上找角色 <span class="desc">搜萌娘百科，自动整理成人设草稿</span></h2>
+        <div class="body">
+          <div style="display:flex;gap:10px;padding:12px 0;align-items:center">
+            <input type="text" id="searchQuery" placeholder="角色名 + 作品名，例如：芙宁娜 原神" style="flex:1">
+            <select id="searchMode" style="width:150px">
+              <option value="web">联网抓百科</option>
+              <option value="model">用模型知识</option>
+            </select>
+            <button id="searchPersona">搜索</button>
+          </div>
+          <div class="hint" style="padding-bottom:10px">
+            联网抓百科（哔哩哔哩wiki + 萌娘百科）：能拿到角色图鉴、官方介绍和真实台词，最准但需要 30~60 秒；
+            模型知识：直接用 AI 自身认知，几秒出结果，热门角色够用。
+            <br>搜索结果只填入表单，<strong>不会自动保存</strong>。
+          </div>
+          <div id="searchStatus" style="font-size:12.5px;color:var(--muted);padding-bottom:8px"></div>
+        </div>
+      </div>
+
+      <div class="toolbar">
+        <button class="ghost" id="reloadPersona">重新加载</button>
+        <span class="grow"></span>
+        <span class="note" id="personaDirty" style="font-size:12px;color:var(--muted)"></span>
+      </div>
+      <div id="personaFields"><div class="empty">加载中…</div></div>
+
+      <div class="box">
+        <h2>提示词预览 <span class="desc">保存后实际发给模型的内容</span>
+          <button class="ghost" id="togglePreview" style="margin-left:auto;font-size:12px;padding:4px 10px">展开</button>
+        </h2>
+        <div class="body hidden" id="previewBody">
+          <pre id="previewText" style="background:#0a0c10;border:1px solid var(--border);border-radius:6px;padding:14px;font-family:ui-monospace,Consolas,monospace;font-size:11.5px;line-height:1.7;white-space:pre-wrap;max-height:400px;overflow:auto;margin:12px 0"></pre>
+        </div>
+      </div>
+
+      <div class="savebar">
+        <button id="savePersona">保存人设</button>
+        <button class="ghost" id="discardPersona">放弃改动</button>
+        <span class="note">保存后立即生效，无需重启</span>
+      </div>
+    </div>
+
+    <!-- 服装 -->
+    <div class="page" id="page-outfits">
+      <div class="box">
+        <h2>现在该穿什么 <span class="desc">按时间和聊天内容自动判断</span></h2>
+        <div class="body" id="outfitNow"><div class="empty">加载中…</div></div>
+      </div>
+
+      <div class="box">
+        <h2>日常装 <span class="desc">就是人设里的「外貌特征」，要改去人设页</span></h2>
+        <div class="body">
+          <div class="field">
+            <div class="meta">
+              <div class="name">日常装 tag</div>
+              <div class="hint" id="workTags" style="font-family:ui-monospace,monospace;word-break:break-word">—</div>
+            </div>
+            <div class="ctrl"><button class="ghost" id="gotoPersona">去人设页改</button></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="box">
+        <h2>场景服装 <span class="desc">没配置的场景会跟随日常装</span></h2>
+        <div class="body">
+          <div class="outfit-cards" id="outfitCards"><div class="empty">加载中…</div></div>
+        </div>
+      </div>
+
+      <div class="savebar">
+        <button class="ghost" id="reloadOutfits">重新加载</button>
+        <span class="note">从服装库选好衣服后点「生成这套」，生成成功会自动保存</span>
+      </div>
+    </div>
+
+    <!-- 配置 -->
+    <div class="page" id="page-config">
+      <div class="toolbar">
+        <button class="ghost" id="reloadConfig">重新加载</button>
+        <button class="ghost" id="resetConfig">从模板重建</button>
+        <span class="grow"></span>
+        <span class="note" id="dirtyCount" style="font-size:12px;color:var(--muted)"></span>
+      </div>
+      <div id="configGroups"><div class="empty">加载中…</div></div>
+      <div class="savebar">
+        <button id="saveConfig">保存配置</button>
+        <button class="ghost" id="discardConfig">放弃改动</button>
+        <span class="note" id="saveNote">改动会同时写入 config.yaml</span>
+      </div>
+    </div>
+
+    <!-- 长期记忆 -->
+    <div class="page" id="page-memories">
+      <div class="toolbar">
+        <select id="memConv" style="width:280px"><option value="">全部会话</option></select>
+        <button class="ghost" id="reloadMemories">刷新</button>
+        <span class="grow"></span>
+        <span class="note" id="memTotal" style="font-size:12px;color:var(--muted)"></span>
+      </div>
+      <div class="box"><div class="body" style="padding:0">
+        <table>
+          <thead><tr><th style="width:80px">类型</th><th>记忆内容</th><th style="width:100px">主体</th><th style="width:120px">时间</th><th style="width:50px"></th></tr></thead>
+          <tbody id="memBody"></tbody>
+        </table>
+        <div class="empty hidden" id="memEmpty">还没有记忆。群里聊够轮数后会自动整理。</div>
+      </div></div>
+    </div>
+
+    <!-- 中期记忆 -->
+    <div class="page" id="page-midterm">
+      <div class="toolbar"><button class="ghost" id="reloadMid">刷新</button></div>
+      <div class="box"><div class="body" style="padding:0">
+        <table>
+          <thead><tr><th style="width:150px">时间范围</th><th>摘要与线索</th><th style="width:100px">参与人</th><th style="width:50px">召回</th></tr></thead>
+          <tbody id="midBody"></tbody>
+        </table>
+        <div class="empty hidden" id="midEmpty">还没有中期记忆。对话超过短期窗口后自动生成。</div>
+      </div></div>
+    </div>
+
+    <!-- 人物画像 -->
+    <div class="page" id="page-profiles">
+      <div class="toolbar"><button class="ghost" id="reloadProfiles">刷新</button></div>
+      <div class="box"><div class="body" style="padding:0">
+        <table>
+          <thead><tr><th style="width:120px">人物</th><th>画像</th><th style="width:60px">记忆数</th><th style="width:120px">更新时间</th></tr></thead>
+          <tbody id="profBody"></tbody>
+        </table>
+        <div class="empty hidden" id="profEmpty">还没有人物画像。同一人积累 3 条以上记忆后自动生成。</div>
+      </div></div>
+    </div>
+
+    <!-- 召回记录 -->
+    <div class="page" id="page-audit">
+      <div class="toolbar"><button class="ghost" id="reloadAudit">刷新</button></div>
+      <div class="box"><div class="body" style="padding:0">
+        <table>
+          <thead><tr><th>查询内容</th><th style="width:60px">命中</th><th style="width:70px">来源</th><th style="width:70px">耗时</th><th style="width:120px">时间</th></tr></thead>
+          <tbody id="auditBody"></tbody>
+        </table>
+        <div class="empty hidden" id="auditEmpty">还没有召回记录。</div>
+      </div></div>
+    </div>
+
+    <!-- 日志 -->
+    <div class="page" id="page-logs">
+      <div class="toolbar">
+        <button class="ghost" id="reloadLog">刷新</button>
+        <label style="font-size:12px;color:var(--muted);display:flex;align-items:center;gap:6px;cursor:pointer">
+          <input type="checkbox" id="autoScrollLog" checked style="width:auto"> 自动滚动
+        </label>
+        <label style="font-size:12px;color:var(--muted);display:flex;align-items:center;gap:6px;cursor:pointer">
+          <input type="checkbox" id="autoRefreshLog" style="width:auto"> 每 3 秒刷新
+        </label>
+        <select id="logLines" style="width:110px">
+          <option value="100">100 行</option>
+          <option value="300" selected>300 行</option>
+          <option value="800">800 行</option>
+          <option value="2000">2000 行</option>
+        </select>
+        <span class="grow"></span>
+        <span class="note" id="logInfo" style="font-size:12px;color:var(--muted)"></span>
+      </div>
+      <pre id="logView"></pre>
+    </div>
+
+    <!-- 诊断 -->
+    <div class="page" id="page-tools">
+      <div class="box">
+        <h2>连通性测试</h2>
+        <div class="body">
+          <div class="testrow">
+            <div class="tname"><div class="name">LLM 接口</div><div class="hint">发一条测试消息，验证模型可用</div></div>
+            <span class="testresult" id="r-llm">未测试</span>
+            <button class="ghost" id="testLlm">测试</button>
+          </div>
+          <div class="testrow">
+            <div class="tname"><div class="name">向量服务</div><div class="hint">检查嵌入与检索服务健康状态</div></div>
+            <span class="testresult" id="r-vector">未测试</span>
+            <button class="ghost" id="testVector">测试</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="box">
+        <h2>数据概况</h2>
+        <div class="body" id="dataOverview"><div class="empty">加载中…</div></div>
+      </div>
+
+      <div class="box">
+        <h2>危险操作</h2>
+        <div class="body">
+          <div class="testrow">
+            <div class="tname"><div class="name">从模板重建 config.yaml</div><div class="hint">会覆盖当前配置文件，注释恢复为模板默认</div></div>
+            <button class="danger" id="resetConfig2">重建</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- 服装库弹层 -->
+  <div class="modal-mask" id="clothingMask">
+    <div class="modal-box">
+      <div class="modal-head">
+        <h3>从服装库选 · <span id="clothingSceneName">—</span></h3>
+        <button class="ghost" id="clothingClose" style="font-size:12px;padding:3px 10px">关闭</button>
+      </div>
+      <div class="modal-tools">
+        <input type="text" id="clothingSearch" placeholder="搜索中文名或英文 tag，例如：裙 / dress">
+        <div class="cat-tabs" id="clothingCats"></div>
+      </div>
+      <div class="clothing-list" id="clothingList"><div class="empty">加载中…</div></div>
+      <div class="selected-bar" id="clothingSelected">还没有选择任何衣服</div>
+      <div class="modal-foot">
+        <span class="note" id="clothingNote"></span>
+        <button class="ghost" id="clothingClear">清空选择</button>
+        <button id="clothingGenerate">生成这套</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+
+let SCHEMA = null;
+let CURRENT = { values: {}, secrets: {} };
+let PENDING = {};   // path -> value
+
+function toast(msg, isError = false) {
+  const el = $('toast');
+  el.textContent = msg;
+  el.classList.toggle('err', isError);
+  el.classList.add('show');
+  clearTimeout(el._timer);
+  el._timer = setTimeout(() => el.classList.remove('show'), 2800);
+}
+
+function fmtDuration(sec) {
+  if (!sec || sec < 0) return '—';
+  const d = Math.floor(sec / 86400);
+  const h = Math.floor((sec % 86400) / 3600);
+  const m = Math.floor((sec % 3600) / 60);
+  const s = sec % 60;
+  if (d > 0) return d + '天 ' + h + '时';
+  if (h > 0) return h + '时 ' + m + '分';
+  if (m > 0) return m + '分 ' + s + '秒';
+  return s + '秒';
+}
+
+function esc(t) {
+  return String(t ?? '').replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+async function api(path, options) {
+  const res = await fetch(path, options);
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const detail = data.errors ? data.errors.map((e) => e.path + ': ' + e.message).join('; ') : data.error;
+    throw new Error(detail || ('HTTP ' + res.status));
+  }
+  return data;
+}
+
+// ── 概览 ──
+async function loadStatus() {
+  try {
+    const d = await api('/api/status');
+    const rt = d.runtime || {};
+    const st = d.stats || {};
+
+    $('statusDot').className = 'dot ' + (rt.onebotConnected ? 'ok' : 'err');
+    $('selfBadge').textContent = rt.selfName ? rt.selfName + ' (' + rt.selfId + ')' : '等待登录';
+    $('uptime').textContent = fmtDuration(rt.uptimeSec);
+    $('msgCount').textContent = st.rawMessages ?? 0;
+    $('memCount').textContent = st.memories ?? 0;
+    $('midCount').textContent = st.midTermMemories ?? 0;
+    $('profCount').textContent = st.profiles ?? 0;
+    $('convCount').textContent = st.conversations ?? 0;
+
+    // 用量：token 上万后换成 k/M，直观一点
+    const u = d.usage || {};
+    const fmtTokens = (n) => {
+      const v = Number(n) || 0;
+      if (v >= 1e6) return (v / 1e6).toFixed(2) + 'M';
+      if (v >= 1e4) return (v / 1e3).toFixed(1) + 'k';
+      return String(v);
+    };
+    $('usageToday').textContent = fmtTokens(u.today?.totalTokens);
+    $('usageToday').title = 'prompt ' + (u.today?.promptTokens ?? 0) + ' / completion ' + (u.today?.completionTokens ?? 0) + '（其中思考 ' + (u.today?.reasoningTokens ?? 0) + '）· 调用 ' + (u.today?.calls ?? 0) + ' 次';
+    $('usageTotal').textContent = fmtTokens(u.total?.totalTokens);
+    $('usageTotal').title = '共 ' + (u.days ?? 0) + ' 天，调用 ' + (u.total?.calls ?? 0) + ' 次';
+
+    $('s-onebot').innerHTML = rt.onebotConnected ? '<span class="dot ok"></span>' : '<span class="dot err"></span>';
+    $('s-account').textContent = rt.selfId ? (rt.selfName || '') + ' (' + rt.selfId + ')' : '未知';
+    const v = d.vector || {};
+    $('s-vector').innerHTML = v.reachable ? '<span class="dot ok"></span>' : '<span class="dot warn"></span>';
+    $('s-vector-url').textContent = v.url || '';
+    const llm = d.llm || {};
+    $('s-llm').textContent = llm.model || '未配置';
+    $('s-llm-url').textContent = llm.baseUrl || '';
+    $('s-freq').textContent = (d.trigger || {}).frequency;
+    $('s-jobs').textContent = st.pendingJobs ?? 0;
+
+    $('conn').textContent = (rt.onebotConnected ? '已连接' : '未连接') + ' · 运行 ' + fmtDuration(rt.uptimeSec);
+
+    // 配置摘要
+    const tr = d.trigger || {};
+    const rows = [
+      ['回复频率', tr.frequency],
+      ['@ 必回', tr.replyOnAt ? '开启' : '关闭'],
+      ['提及必回', tr.replyOnMention ? '开启' : '关闭'],
+      ['LLM', (d.llm || {}).model || '—'],
+      ['向量服务', (d.vector || {}).reachable ? '正常' : '降级'],
+      ['面板端口', (d.webui || {}).port || '—'],
+    ];
+    $('summaryBody').innerHTML = rows.map(([k, v]) =>
+      '<div class="field"><div class="meta"><div class="name">' + esc(k) + '</div></div><div class="ctrl" style="width:auto;font-size:13px">' + esc(v) + '</div></div>'
+    ).join('');
+  } catch (err) {
+    $('statusDot').className = 'dot err';
+    $('conn').textContent = '面板连接失败';
+  }
+}
+
+// ── 人设 ──
+let PERSONA = { fields: [], values: {}, original: {} };
+
+async function loadPersona() {
+  try {
+    const d = await api('/api/persona');
+    PERSONA.fields = d.fields || [];
+    PERSONA.values = { ...(d.persona || {}) };
+    PERSONA.original = { ...(d.persona || {}) };
+    renderPersona();
+    updatePersonaDirty();
+    $('previewText').textContent = d.preview || '';
+  } catch (err) {
+    toast('读取人设失败: ' + err.message, true);
+  }
+}
+
+function renderPersona() {
+  const container = $('personaFields');
+  container.innerHTML = '';
+  const box = document.createElement('div');
+  box.className = 'box';
+  box.innerHTML = '<h2>角色设定 <span class="desc">这段内容决定她是谁、怎么说话</span></h2>';
+
+  const body = document.createElement('div');
+  body.className = 'body';
+
+  for (const field of PERSONA.fields) {
+    const wrap = document.createElement('div');
+    wrap.className = 'persona-field';
+
+    const head = document.createElement('div');
+    head.className = 'head';
+    head.innerHTML = '<span class="label">' + esc(field.label) + '</span>' +
+      '<span class="count" data-for="' + esc(field.key) + '"></span>';
+
+    const value = PERSONA.values[field.key] ?? '';
+    let ctrl;
+    if (field.type === 'textarea') {
+      ctrl = document.createElement('textarea');
+      ctrl.rows = field.rows || 4;
+      ctrl.value = value;
+      ctrl.placeholder = field.placeholder || '';
+      ctrl.oninput = () => {
+        setPersonaValue(field.key, ctrl.value, ctrl);
+        updateCount(field, ctrl.value);
+      };
+    } else {
+      ctrl = document.createElement('input');
+      ctrl.type = 'text';
+      ctrl.value = value;
+      ctrl.placeholder = field.placeholder || '';
+      ctrl.oninput = () => {
+        setPersonaValue(field.key, ctrl.value, ctrl);
+        updateCount(field, ctrl.value);
+      };
+    }
+    ctrl.dataset.key = field.key;
+
+    const hint = document.createElement('div');
+    hint.className = 'hint2';
+    hint.textContent = field.hint || '';
+
+    wrap.appendChild(head);
+    wrap.appendChild(ctrl);
+    if (field.hint) wrap.appendChild(hint);
+    body.appendChild(wrap);
+    setTimeout(() => updateCount(field, value), 0);
+  }
+
+  box.appendChild(body);
+  container.appendChild(box);
+}
+
+function updateCount(field, value) {
+  const el = document.querySelector('.count[data-for="' + field.key + '"]');
+  if (!el) return;
+  const len = String(value || '').length;
+  const max = field.maxLength || 0;
+  el.textContent = max ? len + ' / ' + max : String(len);
+  el.style.color = max && len > max * 0.95 ? 'var(--warn)' : 'var(--muted)';
+}
+
+function setPersonaValue(key, value, el) {
+  PERSONA.values[key] = value;
+  if (el) el.classList.toggle('changed', value !== PERSONA.original[key]);
+  updatePersonaDirty();
+}
+
+function updatePersonaDirty() {
+  const changed = PERSONA.fields.filter((f) => PERSONA.values[f.key] !== PERSONA.original[f.key]);
+  $('personaDirty').textContent = changed.length > 0 ? changed.length + ' 项待保存' : '';
+  $('savePersona').disabled = changed.length === 0;
+  $('discardPersona').disabled = changed.length === 0;
+}
+
+async function savePersona() {
+  try {
+    const d = await api('/api/persona', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(PERSONA.values),
+    });
+    PERSONA.values = { ...(d.persona || {}) };
+    PERSONA.original = { ...(d.persona || {}) };
+    renderPersona();
+    updatePersonaDirty();
+    $('previewText').textContent = d.preview || '';
+    toast('人设已保存，立即生效');
+  } catch (err) {
+    toast('保存失败: ' + err.message, true);
+  }
+}
+
+function discardPersona() {
+  PERSONA.values = { ...PERSONA.original };
+  renderPersona();
+  updatePersonaDirty();
+}
+
+async function refreshPreview() {
+  try {
+    const d = await api('/api/persona/preview', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(PERSONA.values),
+    });
+    $('previewText').textContent = d.preview || '';
+  } catch {}
+}
+
+async function searchPersonaDraft() {
+  const query = $('searchQuery').value.trim();
+  if (!query) {
+    toast('请填写角色名', true);
+    return;
+  }
+
+  const btn = $('searchPersona');
+  const status = $('searchStatus');
+  const mode = $('searchMode').value;
+  btn.disabled = true;
+  btn.textContent = '搜索中…';
+  status.textContent = mode === 'web'
+    ? '正在抓取百科资料并整理人设，通常需要 30~60 秒…'
+    : '正在用模型知识生成人设…';
+  status.style.color = 'var(--muted)';
+
+  try {
+    const d = await api('/api/persona/search', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query, mode }),
+    });
+
+    if (!d.ok) {
+      status.textContent = d.error || '生成失败';
+      status.style.color = 'var(--err)';
+      return;
+    }
+
+    // 填入表单但不保存
+    for (const [key, value] of Object.entries(d.draft || {})) {
+      PERSONA.values[key] = value;
+    }
+    renderPersona();
+    updatePersonaDirty();
+    refreshPreview();
+
+    const sourceNote = d.source ? '（来源：' + d.source + '）' : '';
+    status.textContent = '草稿已生成' + sourceNote + '，请检查后保存' + (d.warning ? ' — ' + d.warning : '');
+    status.style.color = d.warning ? 'var(--warn)' : 'var(--ok)';
+    toast('人设草稿已生成，确认后点保存');
+  } catch (err) {
+    status.textContent = '失败: ' + err.message;
+    status.style.color = 'var(--err)';
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '搜索';
+  }
+}
+
+// ── 配置渲染 ──
+async function loadSchema() {
+  if (SCHEMA) return SCHEMA;
+  const d = await api('/api/config/schema');
+  SCHEMA = d.groups;
+  return SCHEMA;
+}
+
+async function loadConfig() {
+  try {
+    await loadSchema();
+    const d = await api('/api/config');
+    CURRENT = { values: d.values || {}, secrets: d.secrets || {} };
+    PENDING = {};
+    renderConfig();
+    updateDirty();
+  } catch (err) {
+    toast('读取配置失败: ' + err.message, true);
+  }
+}
+
+function currentValue(path) {
+  if (path in PENDING) return PENDING[path];
+  return CURRENT.values[path];
+}
+
+function renderConfig() {
+  const container = $('configGroups');
+  container.innerHTML = '';
+  for (const group of SCHEMA) {
+    const box = document.createElement('div');
+    box.className = 'box';
+    box.innerHTML = '<h2>' + esc(group.title) + ' <span class="desc">' + esc(group.desc || '') + '</span></h2>';
+    const body = document.createElement('div');
+    body.className = 'body';
+
+    for (const item of group.items) {
+      const field = document.createElement('div');
+      field.className = 'field';
+      const meta = document.createElement('div');
+      meta.className = 'meta';
+      meta.innerHTML = '<div class="name">' + esc(item.label) + '</div>' +
+        (item.hint ? '<div class="hint">' + esc(item.hint) + '</div>' : '');
+      const ctrl = document.createElement('div');
+      ctrl.className = 'ctrl';
+      ctrl.appendChild(buildControl(item));
+      field.appendChild(meta);
+      field.appendChild(ctrl);
+      body.appendChild(field);
+    }
+    box.appendChild(body);
+    container.appendChild(box);
+  }
+}
+
+function buildControl(item) {
+  const value = currentValue(item.path);
+
+  if (item.type === 'boolean') {
+    const wrap = document.createElement('label');
+    wrap.className = 'switch';
+    const input = document.createElement('input');
+    input.type = 'checkbox';
+    input.checked = Boolean(value);
+    input.onchange = () => setPending(item.path, input.checked, input.closest('.field'));
+    wrap.appendChild(input);
+    wrap.appendChild(document.createElement('span'));
+    return wrap;
+  }
+
+  if (item.type === 'enum') {
+    const sel = document.createElement('select');
+    for (const opt of item.options || []) {
+      const o = document.createElement('option');
+      o.value = opt.value;
+      o.textContent = opt.label;
+      if (String(value) === String(opt.value)) o.selected = true;
+      sel.appendChild(o);
+    }
+    sel.onchange = () => setPending(item.path, sel.value, sel.closest('.field'));
+    return sel;
+  }
+
+  if (item.type === 'number') {
+    const input = document.createElement('input');
+    input.type = 'number';
+    if (item.min !== undefined) input.min = item.min;
+    if (item.max !== undefined) input.max = item.max;
+    input.step = item.step ?? 'any';
+    input.value = value ?? '';
+    input.oninput = () => setPending(item.path, input.value === '' ? '' : Number(input.value), input.closest('.field'));
+    return input;
+  }
+
+  if (item.type === 'array') {
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.value = Array.isArray(value) ? value.join(', ') : (value ?? '');
+    input.placeholder = '逗号分隔';
+    input.oninput = () => setPending(item.path, input.value, input.closest('.field'));
+    return input;
+  }
+
+  if (item.type === 'secret') {
+    const input = document.createElement('input');
+    input.type = 'password';
+    input.placeholder = CURRENT.secrets[item.path] ? '已设置（留空则不修改）' : '未设置';
+    input.oninput = () => {
+      if (input.value === '') return;
+      setPending(item.path, input.value, input.closest('.field'));
+    };
+    return input;
+  }
+
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.value = value ?? '';
+  input.oninput = () => setPending(item.path, input.value, input.closest('.field'));
+  return input;
+}
+
+function setPending(path, value, fieldEl) {
+  PENDING[path] = value;
+  if (fieldEl) {
+    const ctrl = fieldEl.querySelector('input, select');
+    if (ctrl) ctrl.classList.add('changed');
+  }
+  updateDirty();
+}
+
+function updateDirty() {
+  const n = Object.keys(PENDING).length;
+  $('dirtyCount').textContent = n > 0 ? n + ' 项待保存' : '';
+  $('saveConfig').disabled = n === 0;
+  $('discardConfig').disabled = n === 0;
+}
+
+async function saveConfig() {
+  if (Object.keys(PENDING).length === 0) return;
+  try {
+    const d = await api('/api/config', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(PENDING),
+    });
+    CURRENT = { values: d.values || {}, secrets: d.secrets || {} };
+    PENDING = {};
+    renderConfig();
+    updateDirty();
+    toast('已保存 ' + (d.applied || []).length + ' 项');
+    if (d.restartRequired && d.restartRequired.length > 0) {
+      toast('以下配置需重启生效: ' + d.restartRequired.join(', '), true);
+    }
+    loadStatus();
+  } catch (err) {
+    toast('保存失败: ' + err.message, true);
+  }
+}
+
+async function resetConfig() {
+  if (!confirm('从模板重建 config.yaml？当前配置会被覆盖。')) return;
+  try {
+    await api('/api/config/reset', { method: 'POST' });
+    toast('已重建，请重启程序');
+    loadConfig();
+  } catch (err) {
+    toast('重建失败: ' + err.message, true);
+  }
+}
+
+// ── 记忆 ──
+async function loadConversations() {
+  try {
+    const d = await api('/api/conversations');
+    const sel = $('memConv');
+    const cur = sel.value;
+    sel.innerHTML = '<option value="">全部会话</option>';
+    for (const c of d.conversations || []) {
+      const o = document.createElement('option');
+      o.value = c.conversation_id;
+      o.textContent = c.conversation_id + ' (' + c.memory_count + ' 记忆)';
+      sel.appendChild(o);
+    }
+    sel.value = cur;
+  } catch {}
+}
+
+async function loadMemories() {
+  const conv = $('memConv').value;
+  try {
+    const d = await api('/api/memories' + (conv ? '?conversation_id=' + encodeURIComponent(conv) : ''));
+    const rows = d.rows || [];
+    $('memTotal').textContent = '共 ' + (d.total ?? 0) + ' 条';
+    $('memBody').innerHTML = rows.map((r) =>
+      '<tr><td><span class="tag ' + esc(r.memory_type) + '">' + esc(r.memory_type) + '</span></td>' +
+      '<td>' + esc(r.judgment) + '</td>' +
+      '<td>' + esc(r.subject || '—') + '</td>' +
+      '<td class="mono">' + esc(r.created_at || '') + '</td>' +
+      '<td><button class="danger" data-id="' + esc(r.memory_id) + '">删</button></td></tr>'
+    ).join('');
+    $('memEmpty').classList.toggle('hidden', rows.length > 0);
+    $('memBody').querySelectorAll('button.danger').forEach((b) => {
+      b.onclick = () => deleteMemory(b.dataset.id);
+    });
+  } catch (err) { toast('读取记忆失败: ' + err.message, true); }
+}
+
+async function deleteMemory(id) {
+  if (!confirm('删除这条记忆？')) return;
+  try {
+    await api('/api/memories?memory_id=' + encodeURIComponent(id), { method: 'DELETE' });
+    toast('已删除'); loadMemories(); loadStatus();
+  } catch (err) { toast('删除失败: ' + err.message, true); }
+}
+
+async function loadMidTerm() {
+  try {
+    const d = await api('/api/mid-term');
+    const rows = d.rows || [];
+    $('midBody').innerHTML = rows.map((r) => {
+      const cues = (r.recall_cues || []).join(' / ');
+      return '<tr><td class="mono">' + esc(r.time_range || '—') + '</td>' +
+        '<td>' + esc(r.summary) + (cues ? '<div class="hint" style="color:var(--muted);margin-top:4px">线索: ' + esc(cues) + '</div>' : '') + '</td>' +
+        '<td>' + esc(r.participants || '—') + '</td>' +
+        '<td>' + (r.recalled_count ?? 0) + '</td></tr>';
+    }).join('');
+    $('midEmpty').classList.toggle('hidden', rows.length > 0);
+  } catch (err) { toast('读取中期记忆失败: ' + err.message, true); }
+}
+
+async function loadProfiles() {
+  try {
+    const d = await api('/api/profiles');
+    const rows = d.rows || [];
+    $('profBody').innerHTML = rows.map((r) =>
+      '<tr><td>' + esc(r.person_name || r.person_id) +
+      '<div class="mono" style="color:var(--muted);font-size:10.5px">' + esc(r.person_id) + '</div></td>' +
+      '<td style="white-space:pre-wrap">' + esc(r.profile_text) + '</td>' +
+      '<td>' + (r.fact_count ?? 0) + '</td>' +
+      '<td class="mono">' + esc(r.updated_at || '') + '</td></tr>'
+    ).join('');
+    $('profEmpty').classList.toggle('hidden', rows.length > 0);
+  } catch (err) { toast('读取画像失败: ' + err.message, true); }
+}
+
+async function loadAudit() {
+  try {
+    const d = await api('/api/recall-audit');
+    const rows = d.rows || [];
+    $('auditBody').innerHTML = rows.map((r) =>
+      '<tr><td>' + esc(r.query) + '</td><td>' + (r.hit_count ?? 0) + '</td>' +
+      '<td><span class="tag">' + esc(r.source || '') + '</span></td>' +
+      '<td class="mono">' + (r.elapsed_ms ?? 0) + 'ms</td>' +
+      '<td class="mono">' + esc(r.created_at || '') + '</td></tr>'
+    ).join('');
+    $('auditEmpty').classList.toggle('hidden', rows.length > 0);
+  } catch (err) { toast('读取召回记录失败: ' + err.message, true); }
+}
+
+// ── 日志 ──
+async function loadLog() {
+  try {
+    const lines = $('logLines').value;
+    const d = await api('/api/logs?lines=' + lines);
+    const html = (d.lines || []).map((line) => {
+      let cls = 'lv-info';
+      if (/\[ERROR\]/.test(line)) cls = 'lv-error';
+      else if (/\[WARN/.test(line)) cls = 'lv-warn';
+      else if (/\[DEBUG\]/.test(line)) cls = 'lv-debug';
+      return '<span class="' + cls + '">' + esc(line) + '</span>';
+    }).join('\n');
+    $('logView').innerHTML = html || '<span class="lv-debug">（日志为空）</span>';
+    $('logInfo').textContent = d.path + ' · ' + Math.round((d.size || 0) / 1024) + ' KB';
+    if ($('autoScrollLog').checked) $('logView').scrollTop = $('logView').scrollHeight;
+  } catch (err) {
+    $('logView').textContent = '读取日志失败: ' + err.message;
+  }
+}
+
+let logTimer = null;
+function setupLogAutoRefresh() {
+  if (logTimer) { clearInterval(logTimer); logTimer = null; }
+  if ($('autoRefreshLog').checked) {
+    logTimer = setInterval(() => {
+      if ($('page-logs').classList.contains('active')) loadLog();
+    }, 3000);
+  }
+}
+
+// ── 诊断 ──
+async function testLlm() {
+  $('r-llm').textContent = '测试中…';
+  $('r-llm').className = 'testresult';
+  try {
+    const d = await api('/api/test/llm', { method: 'POST' });
+    if (d.ok) {
+      $('r-llm').textContent = '正常 · ' + (d.reply || '');
+      $('r-llm').className = 'testresult ok';
+    } else {
+      $('r-llm').textContent = '失败: ' + (d.error || '未知');
+      $('r-llm').className = 'testresult err';
+    }
+  } catch (err) {
+    $('r-llm').textContent = '失败: ' + err.message;
+    $('r-llm').className = 'testresult err';
+  }
+}
+
+async function testVector() {
+  $('r-vector').textContent = '测试中…';
+  $('r-vector').className = 'testresult';
+  try {
+    const d = await api('/api/test/vector', { method: 'POST' });
+    if (d.reachable) {
+      $('r-vector').textContent = '正常 · ' + (d.collection_count ?? 0) + ' 条向量';
+      $('r-vector').className = 'testresult ok';
+    } else {
+      $('r-vector').textContent = '不可达（降级运行）';
+      $('r-vector').className = 'testresult err';
+    }
+  } catch (err) {
+    $('r-vector').textContent = '失败: ' + err.message;
+    $('r-vector').className = 'testresult err';
+  }
+}
+
+async function loadDataOverview() {
+  try {
+    const d = await api('/api/status');
+    const st = d.stats || {};
+    const rows = [
+      ['消息条数', st.rawMessages],
+      ['长期记忆', st.memories],
+      ['中期记忆', st.midTermMemories],
+      ['人物画像', st.profiles],
+      ['会话数', st.conversations],
+      ['待索引任务', st.pendingJobs],
+    ];
+    $('dataOverview').innerHTML = rows.map(([k, v]) =>
+      '<div class="field"><div class="meta"><div class="name">' + esc(k) + '</div></div>' +
+      '<div class="ctrl" style="width:auto;font-size:14px;font-weight:600">' + (v ?? 0) + '</div></div>'
+    ).join('');
+  } catch {}
+}
+
+// ── 导航 ──
+const LOADERS = {
+  overview: () => { loadStatus(); },
+  persona: loadPersona,
+  outfits: loadOutfits,
+  config: loadConfig,
+  memories: () => { loadConversations(); loadMemories(); },
+  midterm: loadMidTerm,
+  profiles: loadProfiles,
+  audit: loadAudit,
+  logs: loadLog,
+  tools: () => { loadDataOverview(); },
+};
+
+document.querySelectorAll('#nav button').forEach((btn) => {
+  btn.onclick = () => {
+    document.querySelectorAll('#nav button').forEach((b) => b.classList.remove('active'));
+    btn.classList.add('active');
+    document.querySelectorAll('.page').forEach((p) => p.classList.remove('active'));
+    $('page-' + btn.dataset.page).classList.add('active');
+    LOADERS[btn.dataset.page]?.();
+  };
+});
+
+$('saveConfig').onclick = saveConfig;
+$('discardConfig').onclick = () => { PENDING = {}; renderConfig(); updateDirty(); };
+$('reloadConfig').onclick = loadConfig;
+$('savePersona').onclick = savePersona;
+$('discardPersona').onclick = discardPersona;
+$('reloadPersona').onclick = loadPersona;
+$('searchPersona').onclick = searchPersonaDraft;
+$('searchQuery').onkeydown = (e) => { if (e.key === 'Enter') searchPersonaDraft(); };
+$('togglePreview').onclick = () => {
+  const body = $('previewBody');
+  const hidden = body.classList.toggle('hidden');
+  $('togglePreview').textContent = hidden ? '展开' : '收起';
+  if (!hidden) refreshPreview();
+};
+$('resetConfig').onclick = resetConfig;
+$('resetConfig2').onclick = resetConfig;
+$('reloadMemories').onclick = loadMemories;
+$('reloadMid').onclick = loadMidTerm;
+$('reloadProfiles').onclick = loadProfiles;
+$('reloadAudit').onclick = loadAudit;
+$('reloadLog').onclick = loadLog;
+$('memConv').onchange = loadMemories;
+$('autoRefreshLog').onchange = setupLogAutoRefresh;
+$('testLlm').onclick = testLlm;
+$('testVector').onclick = testVector;
+
+loadStatus();
+setInterval(() => {
+  if ($('page-overview').classList.contains('active')) loadStatus();
+}, 5000);
+// ── 场景服装 ──
+const outfitState = {
+  outfits: [],
+  appearance: '',
+  editingScene: '',
+  picked: new Set(),
+  category: '',
+  keyword: '',
+  generating: false,
+};
+
+/** 前端算一遍当前场景，仅用于展示，后端另有同样规则。 */
+function currentSceneLabel() {
+  const now = new Date();
+  const hour = now.getHours();
+  const day = now.getDay();
+  if (hour >= 23 || hour < 7) return 'sleep';
+  if (day === 0 || day === 6) return 'casual';
+  if (hour < 19) return 'work';
+  return 'home';
+}
+
+const SCENE_LABELS = { work: '日常装', casual: '私服', home: '居家服', sleep: '睡衣' };
+
+async function loadOutfits() {
+  try {
+    const d = await api('/api/outfits');
+    outfitState.outfits = d.outfits || [];
+    outfitState.appearance = d.appearance || '';
+    $('workTags').textContent = outfitState.appearance || '（还没生成，第一次生图时会自动从人设推断）';
+    renderOutfitNow();
+    renderOutfitCards();
+  } catch (err) {
+    $('outfitCards').innerHTML = '<div class="empty">加载失败: ' + esc(err.message) + '</div>';
+  }
+}
+
+function renderOutfitNow() {
+  const scene = currentSceneLabel();
+  const group = outfitState.outfits.find((o) => o.scene === scene);
+  const count = group?.items?.length || 0;
+  const hint = scene === 'work'
+    ? '日常装就是人设里的外貌特征'
+    : (count === 0
+      ? '这套还没配，实际会穿日常装'
+      : `这套配了 ${count} 套，生图时随机挑一套穿`);
+  $('outfitNow').innerHTML =
+    '<div class="field"><div class="meta">' +
+    '<div class="name">此刻按时间判断：<span class="now-badge">' + esc(SCENE_LABELS[scene]) + '</span></div>' +
+    '<div class="hint">' + esc(hint) +
+    ' · 聊天里说「睡觉 / 出门 / 在家」会临时覆盖时间判断</div></div></div>';
+}
+
+function renderOutfitCards() {
+  const list = outfitState.outfits || [];
+  if (!list.length) {
+    $('outfitCards').innerHTML = '<div class="empty">没有可编辑的场景</div>';
+    return;
+  }
+
+  $('outfitCards').innerHTML = list.map((o) => {
+    const items = o.items || [];
+    const rows = items.length
+      ? items.map((it) =>
+        '<div class="outfit-row">' +
+        '<div class="tags">' + esc(it.tags) + '</div>' +
+        '<button class="danger" data-del="' + it.id + '">删</button>' +
+        '</div>').join('')
+      : '<div class="outfit-row"><div class="tags empty-tags">还没配，会跟随日常装</div></div>';
+
+    return '<div class="outfit-card">' +
+      '<h3>' + esc(o.label) +
+      ' <span class="now-badge" style="background:var(--panel-3);color:var(--muted)">' + items.length + ' 套</span>' +
+      '</h3>' +
+      '<div class="scene-desc">' + esc(o.desc) + '</div>' +
+      rows +
+      '<div class="actions"><button data-pick="' + esc(o.scene) + '">添加一套</button></div>' +
+      '</div>';
+  }).join('');
+
+  $('outfitCards').querySelectorAll('[data-pick]').forEach((btn) => {
+    btn.onclick = () => openClothing(btn.dataset.pick);
+  });
+  $('outfitCards').querySelectorAll('[data-del]').forEach((btn) => {
+    btn.onclick = () => removeOutfit(btn.dataset.del);
+  });
+}
+
+/** 删除某一套服装。 */
+async function removeOutfit(id) {
+  if (!confirm('删掉这一套？')) return;
+  try {
+    const d = await api('/api/outfits?id=' + encodeURIComponent(id), { method: 'DELETE' });
+    outfitState.outfits = d.outfits || [];
+    renderOutfitCards();
+    renderOutfitNow();
+  } catch (err) {
+    alert('删除失败: ' + err.message);
+  }
+}
+
+async function openClothing(scene) {
+  outfitState.editingScene = scene;
+  outfitState.picked = new Set();
+  outfitState.category = '';
+  outfitState.keyword = '';
+  const item = outfitState.outfits.find((o) => o.scene === scene);
+  $('clothingSceneName').textContent = item ? item.label : scene;
+  $('clothingSearch').value = '';
+  $('clothingNote').textContent = '';
+  $('clothingMask').classList.add('open');
+  renderSelected();
+  await loadClothingCategories();
+  await loadClothingList();
+}
+
+async function loadClothingCategories() {
+  try {
+    const d = await api('/api/clothing?limit=1');
+    const cats = d.categories || [];
+    $('clothingCats').innerHTML = '<button class="active" data-cat="">全部</button>' +
+      cats.map((c) => '<button data-cat="' + esc(c.value) + '">' + esc(c.label) + ' ' + (c.count || '') + '</button>').join('');
+    $('clothingCats').querySelectorAll('button').forEach((btn) => {
+      btn.onclick = () => {
+        outfitState.category = btn.dataset.cat || '';
+        $('clothingCats').querySelectorAll('button').forEach((b) => b.classList.remove('active'));
+        btn.classList.add('active');
+        loadClothingList();
+      };
+    });
+  } catch (err) {
+    $('clothingCats').innerHTML = '';
+  }
+}
+
+async function loadClothingList() {
+  const url = '/api/clothing?q=' + encodeURIComponent(outfitState.keyword) +
+    '&category=' + encodeURIComponent(outfitState.category) + '&limit=80';
+  $('clothingList').innerHTML = '<div class="empty">加载中…</div>';
+  try {
+    const d = await api(url);
+    const items = d.items || [];
+    if (!items.length) {
+      $('clothingList').innerHTML = '<div class="empty">没找到匹配的衣服</div>';
+      return;
+    }
+    $('clothingList').innerHTML = items.map((it) =>
+      '<div class="clothing-item' + (outfitState.picked.has(it.tag) ? ' picked' : '') + '" data-tag="' + esc(it.tag) + '">' +
+      '<div class="t">' + esc(it.label || it.tag) + '</div>' +
+      '<div class="g">' + esc(it.tag) + '</div></div>'
+    ).join('');
+    $('clothingList').querySelectorAll('.clothing-item').forEach((el) => {
+      el.onclick = () => {
+        const tag = el.dataset.tag;
+        if (outfitState.picked.has(tag)) {
+          outfitState.picked.delete(tag);
+        } else {
+          if (outfitState.picked.size >= 12) {
+            alert('最多选 12 件，太多会互相打架');
+            return;
+          }
+          outfitState.picked.add(tag);
+        }
+        el.classList.toggle('picked');
+        renderSelected();
+      };
+    });
+  } catch (err) {
+    $('clothingList').innerHTML = '<div class="empty">加载失败: ' + esc(err.message) + '</div>';
+  }
+}
+
+function renderSelected() {
+  const picked = [...outfitState.picked];
+  $('clothingSelected').innerHTML = picked.length
+    ? '已选 ' + picked.length + ' 件：' + picked.map((t) => '<span class="chip">' + esc(t) + '</span>').join('')
+    : '还没有选择任何衣服';
+  $('clothingGenerate').disabled = picked.length === 0 || outfitState.generating;
+}
+
+async function generateOutfit() {
+  if (outfitState.generating) return;
+  const picked = [...outfitState.picked];
+  if (!picked.length) return;
+
+  outfitState.generating = true;
+  $('clothingGenerate').disabled = true;
+  $('clothingGenerate').textContent = '生成中…';
+  $('clothingNote').textContent = '正在调模型，十几秒';
+  try {
+    const d = await api('/api/outfits/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ scene: outfitState.editingScene, tags: picked }),
+    });
+    // 生成成功就直接保存，省一次点击
+    const saved = await api('/api/outfits', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ scene: outfitState.editingScene, name: d.name || '', tags: d.tags }),
+    });
+    outfitState.outfits = saved.outfits || [];
+    $('clothingMask').classList.remove('open');
+    renderOutfitCards();
+    renderOutfitNow();
+  } catch (err) {
+    $('clothingNote').textContent = '失败: ' + err.message;
+  } finally {
+    outfitState.generating = false;
+    $('clothingGenerate').textContent = '生成这套';
+    renderSelected();
+  }
+}
+
+$('gotoPersona').onclick = () => {
+  document.querySelector('#nav button[data-page="persona"]').click();
+};
+$('reloadOutfits').onclick = loadOutfits;
+$('clothingClose').onclick = () => $('clothingMask').classList.remove('open');
+$('clothingGenerate').onclick = generateOutfit;
+$('clothingClear').onclick = () => {
+  outfitState.picked.clear();
+  $('clothingList').querySelectorAll('.clothing-item').forEach((el) => el.classList.remove('picked'));
+  renderSelected();
+};
+
+let clothingTimer = null;
+$('clothingSearch').oninput = (e) => {
+  clearTimeout(clothingTimer);
+  const value = e.target.value;
+  clothingTimer = setTimeout(() => {
+    outfitState.keyword = value;
+    loadClothingList();
+  }, 250);
+};
+</script>
+</body>
+</html>
