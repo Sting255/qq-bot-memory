@@ -63,6 +63,10 @@ URL 填 `ws://127.0.0.1:3001`，消息格式选 **Array**，扫码登录。
 
 生图、看图、语音、联网这些是可选功能，用到再在 `config.yaml` 里填对应的服务地址与密钥。
 
+**Windows 后台常驻**：双击 `start-silent.vbs`，无控制台窗口启动，进程退出后 10 秒自动重启。
+日志写在 `data/bot-run.log`，管理面板固定在 `http://127.0.0.1:3099`（把 `webui.auto_open`
+设为 `true` 可以让它在启动时自动弹出）。
+
 ## 不会部署？让 AI 帮你
 
 把下面这段直接丢给你的 AI 助手（Claude Code / Cursor / ChatGPT 都行）：

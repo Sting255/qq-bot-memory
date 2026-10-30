@@ -5,5 +5,5 @@ if not exist "data" mkdir data
 echo [%date% %time%] starting bot >> data\bot-restart.log
 node src\main.js >> data\bot-run.log 2>&1
 echo [%date% %time%] bot exited with %errorlevel%, restart in 10s >> data\bot-restart.log
-timeout /t 10 /nobreak > nul
+ping -n 11 127.0.0.1 > nul
 goto loop
